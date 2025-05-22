@@ -15,6 +15,7 @@
     </style>
   </head>
   <body>
+    <button id="resetBtn" style="position:fixed;top:10px;left:10px;z-index:10;">Reset Game</button>
     <script>
 
 let canvasSize, cnv;
@@ -42,6 +43,7 @@ let spawnE = true;
 let playerStatus = "playing";
 let enemies = [];
 const canvasMargin = 0.1; // 3% margin on each side
+let paused = false;
 
 let houses = [
     { x: 0,    y: 0,    w: 0.42, h: 0.25 },
@@ -81,6 +83,8 @@ function setup() {
   centerCanvas();
   sX = 0.57;
   sY = 0.51;
+  cnv.mouseOver(() => { paused = false; });
+  cnv.mouseOut(() => { paused = true; });
 }
 
 function windowResized() {
@@ -146,8 +150,6 @@ function keyPressed() {
         } 
         else if (wave === 3) {
             enemySpawnCount += 12;
-        }
-        if (wave > 4) {
             gameState = "win";
         }
         waveInitialized = false;
@@ -573,6 +575,10 @@ function restartGame() {
     drops = [];
 }
 
+document.getElementById("resetBtn").onclick = function() {
+    restartGame();
+};
+
 function playGame() {
     function drawHUD() {
         textAlign(RIGHT, TOP);
@@ -620,6 +626,14 @@ function playGame() {
 }
 
 function draw() {
+    if (paused) {
+        background(50, 50, 50, 200);
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(0.05 * canvasSize);
+        text("Paused\n(Mouse outside game)", canvasSize/2, canvasSize/2);
+        return;
+    }
     cursor('none');
     if(gameState === "menu"){
         background(150, 150, 150);
@@ -721,4 +735,3 @@ function draw() {
     </script>
   </body>
 </html>
-html
