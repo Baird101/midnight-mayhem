@@ -16,9 +16,8 @@
   </head>
   <body>
     <script>
-let canvasSize, cnv;
 
-// All positions and sizes are now relative (0..1) and scaled by canvasSize
+let canvasSize, cnv;
 let waveChange = false;
 let waveInitialized = false;
 let wave = 1;
@@ -64,6 +63,17 @@ let spawners = [
     {x: 0.5, y: 0.008},
     {x: 0.5, y: 0.983}
 ];
+
+function hasLineOfSight(x1, y1, x2, y2) {
+    // Returns true if there is a clear line between (x1, y1) and (x2, y2)
+    let steps = int(dist(x1, y1, x2, y2) / (0.01 * canvasSize));
+    for (let i = 1; i < steps; i++) {
+        let ix = lerp(x1, x2, i / steps);
+        let iy = lerp(y1, y2, i / steps);
+        if (isInsideHouse(ix, iy)) return false;
+    }
+    return true;
+}
 
 function setup() {
   canvasSize = min(windowWidth, windowHeight) * (1 - 2 * canvasMargin);
@@ -259,47 +269,70 @@ function moveAndShootEnemies() {
     let px = sX * canvasSize, py = sY * canvasSize;
     for (let i = 0; i < enemies.length; i++) {
         let e = enemies[i];
-        if (e.vx === undefined) {
-            e.vx = 0;
-            e.vy = 0;
+        if (e.vx === undefined) { e.vx = 0; e.vy = 0; }
+        if (e.noticed === undefined) { e.noticed = false; e.noticeTimer = 0; e.wanderAngle = random(TWO_PI); }
+
+        // Awareness logic
+        let playerDist = dist(e.x, e.y, px, py);
+        let canSee = playerDist < 0.18 * canvasSize && hasLineOfSight(e.x, e.y, px, py);
+        if (canSee) {
+            e.noticed = true;
+            e.noticeTimer = 120; // frames to stay noticed after losing sight
+        } else if (e.noticeTimer > 0) {
+            e.noticeTimer--;
+            if (e.noticeTimer === 0) e.noticed = false;
         }
-        let avoidX = 0;
-        let avoidY = 0;
-        for (let h of houses) {
-            let closestX = constrain(e.x, h.x * canvasSize, (h.x + h.w) * canvasSize);
-            let closestY = constrain(e.y, h.y * canvasSize, (h.y + h.h) * canvasSize);
-            let distToHouse = dist(e.x, e.y, closestX, closestY);
-            if (distToHouse < 0.067 * canvasSize) {
-                let strength = (0.067 * canvasSize - distToHouse) / (0.067 * canvasSize);
-                avoidX += (e.x - closestX) / distToHouse * strength * 1;
-                avoidY += (e.y - closestY) / distToHouse * strength * 1;
+
+        // If noticed, chase and shoot at player
+        if (e.noticed) {
+            let avoidX = 0, avoidY = 0;
+            for (let h of houses) {
+                let closestX = constrain(e.x, h.x * canvasSize, (h.x + h.w) * canvasSize);
+                let closestY = constrain(e.y, h.y * canvasSize, (h.y + h.h) * canvasSize);
+                let distToHouse = dist(e.x, e.y, closestX, closestY);
+                if (distToHouse < 0.067 * canvasSize) {
+                    let strength = (0.067 * canvasSize - distToHouse) / (0.067 * canvasSize);
+                    avoidX += (e.x - closestX) / distToHouse * strength * 1;
+                    avoidY += (e.y - closestY) / distToHouse * strength * 1;
+                }
             }
+            let dx = px - e.x + random(-0.025, 0.025) * canvasSize;
+            let dy = py - e.y + random(-0.025, 0.025) * canvasSize;
+            let mag = sqrt(dx * dx + dy * dy);
+            dx /= mag; dy /= mag;
+            dx += avoidX * 1.2; dy += avoidY * 1.2;
+            mag = sqrt(dx * dx + dy * dy);
+            dx /= mag; dy /= mag;
+            e.vx += (dx * espeed * canvasSize - e.vx) * 0.1;
+            e.vy += (dy * espeed * canvasSize - e.vy) * 0.1;
+        } else {
+            // Wander randomly
+            if (frameCount % 60 === 0) {
+                e.wanderAngle += random(-PI/4, PI/4);
+            }
+            let dx = cos(e.wanderAngle);
+            let dy = sin(e.wanderAngle);
+            e.vx += (dx * espeed * canvasSize * 0.5 - e.vx) * 0.1;
+            e.vy += (dy * espeed * canvasSize * 0.5 - e.vy) * 0.1;
         }
-        let dx = px - e.x + random(-0.025, 0.025) * canvasSize;
-        let dy = py - e.y + random(-0.025, 0.025) * canvasSize;
-        let mag = sqrt(dx * dx + dy * dy);
-        dx /= mag;
-        dy /= mag;
-        dx += avoidX * 1.2;
-        dy += avoidY * 1.2;
-        mag = sqrt(dx * dx + dy * dy);
-        dx /= mag;
-        dy /= mag;
-        e.vx += (dx * espeed * canvasSize - e.vx) * 0.1;
-        e.vy += (dy * espeed * canvasSize - e.vy) * 0.1;
+
         let nextX = e.x + e.vx;
         let nextY = e.y + e.vy;
         if (!isInsideHouse(nextX, nextY)) {
             e.x = nextX;
             e.y = nextY;
+        } else {
+            // Bounce off house
+            e.wanderAngle += PI/2;
         }
+
         if (e.magazine === undefined) {
             e.magazine = 3;
             e.shootingCooldown = 30;
             e.reloadTime = 90;
         }
         e.shootingCooldown--;
-        if (!isLineBlocked(e.x, e.y, px, py) && e.shootingCooldown <= 0) {
+        if (e.noticed && !isLineBlocked(e.x, e.y, px, py) && e.shootingCooldown <= 0) {
             if (e.magazine > 0) {
                 let angle = atan2(py - e.y, px - e.x);
                 let bulletSpeed = (e.type === "strong") ? 0.008 * canvasSize : 0.013 * canvasSize;
@@ -344,7 +377,10 @@ function spawnEnemies() {
                     x: sx,
                     y: sy,
                     health: 100,
-                    shootingCooldown: 0
+                    shootingCooldown: 0,
+                    noticed: false,
+                    noticeTimer: 0,
+                    wanderAngle: random(TWO_PI)
                 });
                 enemySpawnCount--;
             }
@@ -358,7 +394,10 @@ function spawnEnemies() {
                 x: sx,
                 y: sy,
                 health: 100,
-                shootingCooldown: 0
+                shootingCooldown: 0,
+                noticed: false,
+                noticeTimer: 0,
+                wanderAngle: random(TWO_PI)
             });
         }
     }
@@ -474,6 +513,8 @@ function drawBullets() {
             let e = enemies[j];
             if (dist(b.x, b.y, e.x, e.y) < 0.033 * canvasSize) {
                 e.health -= 25;
+                e.noticed = true; // Enemy notices player if shot
+                e.noticeTimer = 180; // Stay noticed for 3 seconds
                 if (e.health <= 0) {
                     let rand = random(1);
                     if (rand < 0.6) {
@@ -563,7 +604,6 @@ function playGame() {
         }
     }
 }
-
 
 function draw() {
     cursor('none');
@@ -667,3 +707,4 @@ function draw() {
     </script>
   </body>
 </html>
+```html
