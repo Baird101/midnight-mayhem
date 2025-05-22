@@ -275,12 +275,19 @@ function moveAndShootEnemies() {
         // Awareness logic
         let playerDist = dist(e.x, e.y, px, py);
         let canSee = playerDist < 0.18 * canvasSize && hasLineOfSight(e.x, e.y, px, py);
-        if (canSee) {
+        if (canSee && !e.noticed) {
             e.noticed = true;
-            e.noticeTimer = 120; // frames to stay noticed after losing sight
-        } else if (e.noticeTimer > 0) {
+            e.noticeTimer = 120; // Only set timer when first noticing
+        }
+        if (!canSee && e.noticed) {
             e.noticeTimer--;
-            if (e.noticeTimer === 0) e.noticed = false;
+            if (e.noticeTimer <= 0) {
+                e.noticed = false;
+                e.noticeTimer = 0;
+            }
+        }
+        if (canSee && e.noticed) {
+            e.noticeTimer = 120; // Refresh timer only if already noticed and still seeing
         }
 
         // If noticed, chase and shoot at player
@@ -316,8 +323,15 @@ function moveAndShootEnemies() {
             e.vy += (dy * espeed * canvasSize * 0.5 - e.vy) * 0.1;
         }
 
+        // Calculate next position
         let nextX = e.x + e.vx;
         let nextY = e.y + e.vy;
+
+        // Prevent wandering out of the screen
+        let margin = 0.025 * canvasSize;
+        nextX = constrain(nextX, margin, canvasSize - margin);
+        nextY = constrain(nextY, margin, canvasSize - margin);
+
         if (!isInsideHouse(nextX, nextY)) {
             e.x = nextX;
             e.y = nextY;
