@@ -184,6 +184,16 @@ function mousePressed() {
         }
         if (mouseX > 0.333 * canvasSize && mouseX < 0.667 * canvasSize && mouseY > 0.533 * canvasSize && mouseY < 0.617 * canvasSize) {
             gameState = "waves";
+            wave = 1;
+            waveInitialized = false;
+            waveChange = false;
+            enemySpawnCount = 8;
+            playerLives = 5;
+            playerHealth = 100;
+            currentMag = magSize;
+            totalAmmo = 50;
+            enemies = [];
+            drops = [];
         }
         return;
     }
@@ -211,7 +221,7 @@ function mousePressed() {
             }
         }
     }
-    if (mouseButton === RIGHT && homingBullets > 0 && !homingActive && playerStatus === "playing") {
+    if (mouseButton === CENTER && homingBullets > 0 && !homingActive && playerStatus === "playing") {
         let px = sX * canvasSize, py = sY * canvasSize;
         homingActive = {
             x: px,
@@ -225,7 +235,7 @@ function mousePressed() {
 }
 
 function mouseReleased() {
-    if (mouseButton === RIGHT && homingActive) {
+    if (mouseButton === CENTER && homingActive) {
         // Shoot fast in current direction
         let px = sX * canvasSize, py = sY * canvasSize;
         let angle = atan2(mouseY - homingActive.y, mouseX - homingActive.x);
@@ -379,7 +389,7 @@ function moveAndShootEnemies() {
         let nextX = e.x + e.vx;
         let nextY = e.y + e.vy;
 
-        // Prevent enemies from leaving the canvas
+        // Prevent wandering out of the screen
         let margin = 0.025 * canvasSize;
         nextX = constrain(nextX, margin, canvasSize - margin);
         nextY = constrain(nextY, margin, canvasSize - margin);
@@ -525,10 +535,13 @@ function drawGuy() {
         }
     }
     let moveStep = 0.008 * canvasSize;
-    if (keys.right ) { px += moveStep; }
-    if (keys.left )  { px -= moveStep; }
-    if (keys.up )    { py -= moveStep; }
-    if (keys.down )  { py += moveStep; }
+    // Prevent movement if homingActive
+    if (!homingActive) {
+        if (keys.right ) { px += moveStep; }
+        if (keys.left )  { px -= moveStep; }
+        if (keys.up )    { px -= moveStep; }
+        if (keys.down )  { px += moveStep; }
+    }
     // Boundaries
     px = constrain(px, 0.02 * canvasSize, 0.98 * canvasSize);
     py = constrain(py, 0.02 * canvasSize, 0.98 * canvasSize);
@@ -577,6 +590,35 @@ function drawBullets() {
         homingActive.y += homingActive.dy;
         fill(100, 255, 255);
         ellipse(homingActive.x, homingActive.y, 0.03 * canvasSize, 0.03 * canvasSize);
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            let e = enemies[j];
+            if (dist(homingActive.x, homingActive.y, e.x, e.y) < (homingActive.aura || 0.07 * canvasSize)) {
+                e.health -= 60;
+                e.noticed = true;
+                e.noticeTimer = 180;
+                // All enemies in aura notice
+                for (let k = 0; k < enemies.length; k++) {
+                    let ek = enemies[k];
+                    if (dist(homingActive.x, homingActive.y, ek.x, ek.y) < 0.18 * canvasSize && hasLineOfSight(ek.x, ek.y, homingActive.x, homingActive.y)) {
+                        ek.noticed = true;
+                        ek.noticeTimer = 120;
+                        ek.lastSeenX = homingActive.x;
+                        ek.lastSeenY = homingActive.y;
+                    }
+                }
+                if (e.health <= 0) {
+                    let rand = random(1);
+                    if (rand < 0.6) {
+                        drops.push({ x: e.x, y: e.y, type: "ammo" });
+                    } else if (rand < 0.75) {
+                        drops.push({ x: e.x, y: e.y, type: "coin" });
+                    }
+                    enemies.splice(j, 1);
+                }
+                homingActive = null; // Remove the homing bullet
+                break;
+            }
+        }
     }
 
     for (let i = bullets.length - 1; i >= 0; i--) {
@@ -678,6 +720,7 @@ function playGame() {
         strokeWeight(3);
         text("Ammo: " + currentMag + "/" + totalAmmo, 0.9 * canvasSize, 0.017 * canvasSize);
         text("Coins: " + coins, 0.83 * canvasSize, 0.05 * canvasSize);
+        text("Homing: " + homingBullets + "/" + maxHomingBullets, 0.9 * canvasSize, 0.045 * canvasSize);
         if (reloading) {
             text("Reloading...", 0.9 * canvasSize, 0.07 * canvasSize);
         }
