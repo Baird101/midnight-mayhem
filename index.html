@@ -539,8 +539,8 @@ function drawGuy() {
     if (!homingActive) {
         if (keys.right ) { px += moveStep; }
         if (keys.left )  { px -= moveStep; }
-        if (keys.up )    { px -= moveStep; }
-        if (keys.down )  { px += moveStep; }
+        if (keys.up )    { py -= moveStep; }
+        if (keys.down )  { py += moveStep; }
     }
     // Boundaries
     px = constrain(px, 0.02 * canvasSize, 0.98 * canvasSize);
@@ -804,7 +804,6 @@ function draw() {
                 waveChange = false;
             }
         }
-        playGame();
         text(playerLives + " lives left",0.133 * canvasSize,0.067 * canvasSize);
         text(enemySpawnCount + enemies.length +" enemies left",0.183 * canvasSize,0.033 * canvasSize);
     } 
