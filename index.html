@@ -197,7 +197,8 @@ function mousePressed() {
         }
         return;
     }
-    if (mouseButton === LEFT && playerCooldown === 0 && currentMag > 0 && !reloading) {
+    // LEFT for normal bullets
+    if (mouseButton === LEFT && playerCooldown === 0 && currentMag > 0 && !homingActive) {
         let px = sX * canvasSize;
         let py = sY * canvasSize;
         let angle = atan2(mouseY - py, mouseX - px);
@@ -221,6 +222,7 @@ function mousePressed() {
             }
         }
     }
+    // MIDDLE for homing bullets (event.button === 1)
     if (mouseButton === CENTER && homingBullets > 0 && !homingActive && playerStatus === "playing") {
         let px = sX * canvasSize, py = sY * canvasSize;
         homingActive = {
@@ -235,9 +237,9 @@ function mousePressed() {
 }
 
 function mouseReleased() {
-    if (mouseButton === CENTER && homingActive) {
+    // Only release homing bullet if it exists and was following
+    if (homingActive && !homingActive.exploded) {
         // Shoot fast in current direction
-        let px = sX * canvasSize, py = sY * canvasSize;
         let angle = atan2(mouseY - homingActive.y, mouseX - homingActive.x);
         homingActive.dx = cos(angle) * 0.04 * canvasSize;
         homingActive.dy = sin(angle) * 0.04 * canvasSize;
@@ -389,7 +391,7 @@ function moveAndShootEnemies() {
         let nextX = e.x + e.vx;
         let nextY = e.y + e.vy;
 
-        // Prevent wandering out of the screen
+        // Prevent enemies from leaving the canvas
         let margin = 0.025 * canvasSize;
         nextX = constrain(nextX, margin, canvasSize - margin);
         nextY = constrain(nextY, margin, canvasSize - margin);
@@ -582,7 +584,8 @@ function regenerateHealth() {
 
 function drawBullets() {
     if (homingActive) {
-        // Move slowly toward mouse while held
+        // Prevent player movement while homingActive
+        // (Set a global flag or just don't update player position in drawGuy if homingActive)
         let angle = atan2(mouseY - homingActive.y, mouseX - homingActive.x);
         homingActive.dx = cos(angle) * 0.01 * canvasSize;
         homingActive.dy = sin(angle) * 0.01 * canvasSize;
@@ -590,6 +593,8 @@ function drawBullets() {
         homingActive.y += homingActive.dy;
         fill(100, 255, 255);
         ellipse(homingActive.x, homingActive.y, 0.03 * canvasSize, 0.03 * canvasSize);
+
+        // Check collision with enemies while following
         for (let j = enemies.length - 1; j >= 0; j--) {
             let e = enemies[j];
             if (dist(homingActive.x, homingActive.y, e.x, e.y) < (homingActive.aura || 0.07 * canvasSize)) {
@@ -615,7 +620,9 @@ function drawBullets() {
                     }
                     enemies.splice(j, 1);
                 }
-                homingActive = null; // Remove the homing bullet
+                // "Explode" the homing bullet (remove it)
+                homingActive.exploded = true;
+                homingActive = null;
                 break;
             }
         }
