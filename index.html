@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Midnight Mayhem.</title>
+    <title>Midnight Mayhem</title>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
     <style>
       body {
@@ -16,8 +16,10 @@
   </head>
   <body>
     <button id="resetBtn" style="position:fixed;top:10px;left:10px;z-index:10;">Reset Game</button>
+    <h1> Midnight Mayhem</h1>
+    <p>defend the spawners from the zombies</p>
     <script>
-
+{
 let canvasSize, cnv;
 let waveChange = false;
 let waveInitialized = false;
@@ -44,19 +46,16 @@ let playerStatus = "playing";
 let enemies = [];
 const canvasMargin = 0.1; // 3% margin on each side
 let paused = false;
-
-
 let maxHomingBullets = 5;
 let homingTotal = 5; // Total reserve
 let homingMag = 1;   // Loaded (magazine)
 let homingReload = 0;
 let homingReloadTime = 300; // frames
-
 let homingActive = null;
-
 let reloading = false;
 let reloadTimer = 0;
 let reloadTime = 120; // 2 seconds at 60fps
+}
 
 let houses = [
     { x: 0,    y: 0,    w: 0.42, h: 0.25 },
