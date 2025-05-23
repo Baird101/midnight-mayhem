@@ -45,10 +45,13 @@ let enemies = [];
 const canvasMargin = 0.1; // 3% margin on each side
 let paused = false;
 
-let homingBullets = 5;
+
 let maxHomingBullets = 5;
+let homingTotal = 5; // Total reserve
+let homingMag = 1;   // Loaded (magazine)
 let homingReload = 0;
-let homingReloadTime = 300; // frames (5 seconds at 60fps)
+let homingReloadTime = 300; // frames
+
 let homingActive = null;
 
 let reloading = false;
@@ -148,7 +151,7 @@ function checkHouseCollision(b) {
 }
 
 function keyPressed() {
-    if ((keyCode === 82 || keyCode === 17) && !reloading && currentMag < magSize && totalAmmo > 0) {
+    if ((keyCode === 82 || keyCode === 17) && totalAmmo > 0) {
         reloading = true;
         reloadTimer = reloadTime;
     }
@@ -185,15 +188,12 @@ function mousePressed() {
         if (mouseX > 0.333 * canvasSize && mouseX < 0.667 * canvasSize && mouseY > 0.533 * canvasSize && mouseY < 0.617 * canvasSize) {
             gameState = "waves";
             wave = 1;
-            waveInitialized = false;
+            waveInitialized = true;
             waveChange = false;
             enemySpawnCount = 8;
             playerLives = 5;
             playerHealth = 100;
-            currentMag = magSize;
-            totalAmmo = 50;
-            enemies = [];
-            drops = [];
+
         }
         return;
     }
@@ -214,7 +214,7 @@ function mousePressed() {
         // Make enemies in a larger area notice the player
         for (let e of enemies) {
             let px = sX * canvasSize, py = sY * canvasSize;
-            if (dist(e.x, e.y, px, py) < 0.25 * canvasSize && hasLineOfSight(e.x, e.y, px, py)) {
+            if (dist(e.x, e.y, px, py) < 0.1 * canvasSize && hasLineOfSight(e.x, e.y, px, py)) {
                 e.noticed = true;
                 e.noticeTimer = 120;
                 e.lastSeenX = px;
@@ -223,7 +223,8 @@ function mousePressed() {
         }
     }
     // MIDDLE for homing bullets (event.button === 1)
-    if (mouseButton === CENTER && homingBullets > 0 && !homingActive && playerStatus === "playing") {
+    if (mouseButton === CENTER && homingMag > 0 && !homingActive && playerStatus === "playing") {
+
         let px = sX * canvasSize, py = sY * canvasSize;
         homingActive = {
             x: px,
@@ -232,7 +233,8 @@ function mousePressed() {
             dy: 0,
             following: true
         };
-        homingBullets--;
+        homingMag--;
+
     }
 }
 
@@ -306,14 +308,10 @@ function drawEnemyBullets() {
             if (b.shooterId !== j && dist(b.x, b.y, e.x, e.y) < 0.033 * canvasSize) {
                 e.health -= 10;
                 if (e.health <= 0) {
-                    let rand = random(1);
-                    if (rand < 0.6) {
-                        drops.push({ x: e.x, y: e.y, type: "ammo" });
-                    } else if (rand < 0.75) {
-                        drops.push({ x: e.x, y: e.y, type: "coin" });
-                    }
+                    handleEnemyDrops(e, "enemy");
                     enemies.splice(j, 1);
-                }
+            }
+
                 enemyBullets.splice(i, 1);
                 break;
             }
@@ -604,7 +602,7 @@ function drawBullets() {
                 // All enemies in aura notice
                 for (let k = 0; k < enemies.length; k++) {
                     let ek = enemies[k];
-                    if (dist(homingActive.x, homingActive.y, ek.x, ek.y) < 0.18 * canvasSize && hasLineOfSight(ek.x, ek.y, homingActive.x, homingActive.y)) {
+                    if (dist(homingActive.x, homingActive.y, ek.x, ek.y) < 0.05 * canvasSize && hasLineOfSight(ek.x, ek.y, homingActive.x, homingActive.y)) {
                         ek.noticed = true;
                         ek.noticeTimer = 120;
                         ek.lastSeenX = homingActive.x;
@@ -612,14 +610,9 @@ function drawBullets() {
                     }
                 }
                 if (e.health <= 0) {
-                    let rand = random(1);
-                    if (rand < 0.6) {
-                        drops.push({ x: e.x, y: e.y, type: "ammo" });
-                    } else if (rand < 0.75) {
-                        drops.push({ x: e.x, y: e.y, type: "coin" });
-                    }
+                    handleEnemyDrops(e, "player");
                     enemies.splice(j, 1);
-                }
+}
                 // "Explode" the homing bullet (remove it)
                 homingActive.exploded = true;
                 homingActive = null;
@@ -645,8 +638,8 @@ function drawBullets() {
         }
         for (let j = enemies.length - 1; j >= 0; j--) {
             let e = enemies[j];
-            let hitRadius = b.type === "homing" ? (b.aura || 0.07 * canvasSize) : 0.033 * canvasSize;
-            let dmg = b.type === "homing" ? (b.damage || 60) : 25;
+            let hitRadius = b.type === "homing" ? (b.aura || 0.03 * canvasSize) : 0.033 * canvasSize;
+            let dmg = b.type === "homing" ? (b.damage || 70) : 25;
             if (dist(b.x, b.y, e.x, e.y) < hitRadius) {
                 e.health -= dmg;
                 e.noticed = true;
@@ -690,14 +683,17 @@ function restartGame() {
     if(totalAmmo < 50){
         totalAmmo = 50;
     }
-    if(totalAmmo > 90 ){
-        totalAmmo = 90;
+    if(totalAmmo > 100 ){
+        totalAmmo = 100;
     }
     wave = 1;
     gameState = "menu";
     reloadCooldown = 0;
     enemySpawnCount = 8;
     enemyBullets = [];
+    homingMag = 1;
+    homingTotal = 5;
+    homingReload = 0;
     playerCooldown = 0;
     shootingCooldownTime = 10; 
     spawnTimer = 0;
@@ -714,12 +710,7 @@ function restartGame() {
     drops = [];
 }
 
-document.getElementById("resetBtn").onclick = function() {
-    restartGame();
-};
-
-function playGame() {
-    function drawHUD() {
+function drawHUD() {
         textAlign(RIGHT, TOP);
         textSize(0.027 * canvasSize);
         fill(0);
@@ -727,13 +718,20 @@ function playGame() {
         strokeWeight(3);
         text("Ammo: " + currentMag + "/" + totalAmmo, 0.9 * canvasSize, 0.017 * canvasSize);
         text("Coins: " + coins, 0.83 * canvasSize, 0.05 * canvasSize);
-        text("Homing: " + homingBullets + "/" + maxHomingBullets, 0.9 * canvasSize, 0.045 * canvasSize);
+        text("Homing: " + homingMag + "/" + homingTotal, 0.9 * canvasSize, 0.045 * canvasSize);
+
         if (reloading) {
             text("Reloading...", 0.9 * canvasSize, 0.07 * canvasSize);
         }
         noStroke();
     }
-    if (playerCooldown > 0) {
+ 
+document.getElementById("resetBtn").onclick = function() {
+    restartGame();
+};
+
+function playGame() {
+        if (playerCooldown > 0) {
         playerCooldown--;
     }
     drawDrops();
@@ -765,6 +763,41 @@ function playGame() {
             }
             drops.splice(i, 1);
         }
+    }
+    // Reload normal bullets
+if (reloading) {
+    reloadTimer--;
+    if (reloadTimer <= 0) {
+        let needed = magSize - currentMag;
+        let ammoToLoad = min(needed, totalAmmo);
+        currentMag += ammoToLoad;
+        totalAmmo -= ammoToLoad;
+        reloading = false;
+    }
+}
+
+// Reload homing bullet (1 round in mag, up to 5 in total)
+if (homingMag < 1 && homingTotal > 0) {
+    homingReload++;
+    if (homingReload >= homingReloadTime) {
+        homingMag = 1;
+        homingTotal--;
+        homingReload = 0;
+    }
+}
+
+}
+
+function handleEnemyDrops(e, cause = "player") {
+    if (cause !== "player") return; // No drops unless player caused it
+
+    let rand = random(1);
+    if (rand < 0.6) {
+        drops.push({ x: e.x, y: e.y, type: "ammo" });
+    } else if (rand < 0.75) {
+        drops.push({ x: e.x, y: e.y, type: "coin" });
+    } else if (rand < 0.78) {
+        drops.push({ x: e.x, y: e.y, type: "homing", amount: floor(random(1, 3)) });
     }
 }
 
